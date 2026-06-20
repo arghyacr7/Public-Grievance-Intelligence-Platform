@@ -1,0 +1,21 @@
+[{"stream_name":"stderr","time":1.6330822550000001,"data":"/opt/conda/lib/python3.10/site-packages/traitlets/traitlets.py:2930: FutureWarning: --Exporter.preprocessors=[\"nbconvert.preprocessors.ExtractOutputPreprocessor\"] for containers is deprecated in traitlets 5.0. You can pass `--Exporter.preprocessors item` ... multiple times to add items to a list.\n"}
+,{"stream_name":"stderr","time":1.6331751049999998,"data":"  warn(\n"}
+,{"stream_name":"stderr","time":1.636614915,"data":"[NbConvertApp] WARNING | Config option `kernel_spec_manager_class` not recognized by `NbConvertApp`.\n"}
+,{"stream_name":"stderr","time":1.6675528929999999,"data":"[NbConvertApp] Converting notebook __notebook__.ipynb to html\n"}
+,{"stream_name":"stderr","time":2.006418918,"data":"/opt/conda/lib/python3.10/site-packages/nbformat/__init__.py:93: MissingIDFieldWarning: Code cell is missing an id field, this will become a hard error in future nbformat versions. You may want to use `normalize()` on your notebooks before validations (available since nbformat 5.1.4). Previous versions of nbformat are fixing this issue transparently, and will stop doing so in the future.\n"}
+,{"stream_name":"stderr","time":2.006478348,"data":"  validate(nb)\n"}
+,{"stream_name":"stderr","time":3.676279221,"data":"[NbConvertApp] Support files will be in __results___files/\n"}
+,{"stream_name":"stderr","time":3.676317701,"data":"[NbConvertApp] Making directory __results___files\n"}
+,{"stream_name":"stderr","time":3.6794038909999998,"data":"[NbConvertApp] Making directory __results___files\n"}
+,{"stream_name":"stderr","time":3.679707961,"data":"[NbConvertApp] Making directory __results___files\n"}
+,{"stream_name":"stderr","time":3.679898951,"data":"[NbConvertApp] Making directory __results___files\n"}
+,{"stream_name":"stderr","time":3.6801243809999997,"data":"[NbConvertApp] Making directory __results___files\n"}
+,{"stream_name":"stderr","time":3.680415541,"data":"[NbConvertApp] Making directory __results___files\n"}
+,{"stream_name":"stderr","time":3.680597411,"data":"[NbConvertApp] Making directory __results___files\n"}
+,{"stream_name":"stderr","time":3.681107601,"data":"[NbConvertApp] Making directory __results___files\n"}
+,{"stream_name":"stderr","time":3.681384241,"data":"[NbConvertApp] Making directory __results___files\n"}
+,{"stream_name":"stderr","time":3.681421731,"data":"[NbConvertApp] Making directory __results___files\n"}
+,{"stream_name":"stderr","time":3.6861174,"data":"[NbConvertApp] Making directory __results___files\n"}
+,{"stream_name":"stderr","time":3.68673502,"data":"[NbConvertApp] Making directory __results___files\n"}
+,{"stream_name":"stderr","time":3.68696644,"data":"[NbConvertApp] Writing 20715286 bytes to __results__.html\n"}
+]

@@ -1,0 +1,11 @@
+.venv/
+.ultralytics/
+.tmp/
+__pycache__/
+*.pyc
+server.log
+server.err.log
+*.onnx
+*.pt
+.env
+*.db

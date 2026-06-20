@@ -1,0 +1,12 @@
+train: C:\Users\iamar\Downloads\civic_issues_backend\grievance_models\pothole_seg_dataset\Pothole_Segmentation_YOLOv8\train\images
+val: C:\Users\iamar\Downloads\civic_issues_backend\grievance_models\pothole_seg_dataset\Pothole_Segmentation_YOLOv8\valid\images
+
+nc: 1
+names: ['Pothole']
+
+roboflow:
+  workspace: farzad
+  project: pothole_segmentation_yolov8
+  version: 1
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/farzad/pothole_segmentation_yolov8/dataset/1

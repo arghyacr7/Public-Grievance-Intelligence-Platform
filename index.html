@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Civic Issues Detector</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --surface: #ffffff;
+      --surface-soft: #eef4f2;
+      --text: #1f2937;
+      --muted: #64748b;
+      --border: #d7dee8;
+      --primary: #176b5b;
+      --primary-dark: #0f4f43;
+      --accent: #d9480f;
+      --danger: #b42318;
+      --success: #1f7a4d;
+      --shadow: 0 16px 40px rgba(31, 41, 55, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", Arial, sans-serif;
+    }
+
+    main {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 32px 0;
+    }
+
+    header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: clamp(2rem, 4vw, 3.25rem);
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    header p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 1rem;
+      max-width: 680px;
+    }
+
+    .api-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 36px;
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 0.92rem;
+      white-space: nowrap;
+    }
+
+    .status-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--muted);
+      flex: 0 0 auto;
+    }
+
+    .status-dot.ready {
+      background: var(--success);
+    }
+
+    .status-dot.error {
+      background: var(--danger);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 340px minmax(0, 1fr);
+      gap: 20px;
+      align-items: start;
+    }
+
+    .panel,
+    .viewer {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .panel {
+      padding: 18px;
+    }
+
+    .field-label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+
+    .file-picker {
+      display: grid;
+      place-items: center;
+      min-height: 144px;
+      padding: 18px;
+      border: 1px dashed #9aa8b7;
+      border-radius: 8px;
+      background: var(--surface-soft);
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .file-picker:hover,
+    .file-picker:focus-within {
+      border-color: var(--primary);
+      background: #e8f2ee;
+    }
+
+    .file-picker input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .file-icon {
+      display: inline-grid;
+      place-items: center;
+      width: 44px;
+      height: 44px;
+      margin-bottom: 10px;
+      border-radius: 8px;
+      background: #dceee8;
+      color: var(--primary);
+    }
+
+    .file-main {
+      display: block;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .file-sub {
+      display: block;
+      color: var(--muted);
+      font-size: 0.9rem;
+      overflow-wrap: anywhere;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 42px;
+      padding: 10px 14px;
+      border: 0;
+      border-radius: 8px;
+      background: var(--primary);
+      color: #ffffff;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.2s;
+    }
+
+    button:hover {
+      background: var(--primary-dark);
+    }
+
+    button:active {
+      transform: translateY(1px);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      background: #94a3b8;
+    }
+
+    .secondary-button {
+      border: 1px solid var(--border);
+      background: #ffffff;
+      color: var(--text);
+    }
+
+    .secondary-button:hover {
+      background: #f8fafc;
+    }
+
+    .status {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 8px;
+      background: #f8fafc;
+      color: var(--muted);
+      font-size: 0.95rem;
+      line-height: 1.45;
+      min-height: 48px;
+    }
+
+    .status.success {
+      background: #e9f7ef;
+      color: var(--success);
+    }
+
+    .status.error {
+      background: #fff1f0;
+      color: var(--danger);
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .metric {
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #ffffff;
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    .metric strong {
+      display: block;
+      margin-top: 4px;
+      font-size: 1.35rem;
+    }
+
+    .detections {
+      margin-top: 16px;
+    }
+
+    .detections h2 {
+      margin: 0 0 10px;
+      font-size: 1rem;
+    }
+
+    .detection-list {
+      display: grid;
+      gap: 8px;
+      max-height: 320px;
+      overflow: auto;
+    }
+
+    .detection-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #ffffff;
+    }
+
+    .detection-name {
+      overflow-wrap: anywhere;
+      font-weight: 700;
+    }
+
+    .confidence {
+      color: var(--accent);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .viewer {
+      min-height: 520px;
+      overflow: hidden;
+    }
+
+    .canvas-wrap {
+      display: grid;
+      place-items: center;
+      min-height: 520px;
+      padding: 16px;
+      background:
+        linear-gradient(45deg, #f8fafc 25%, transparent 25%),
+        linear-gradient(-45deg, #f8fafc 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #f8fafc 75%),
+        linear-gradient(-45deg, transparent 75%, #f8fafc 75%);
+      background-color: #eef2f6;
+      background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+      background-size: 16px 16px;
+    }
+
+    canvas {
+      display: none;
+      width: auto;
+      max-width: 100%;
+      height: auto;
+      max-height: min(76vh, 820px);
+      border-radius: 8px;
+      background: #ffffff;
+      box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14);
+    }
+
+    .empty-state {
+      display: grid;
+      place-items: center;
+      width: min(420px, 100%);
+      min-height: 260px;
+      padding: 24px;
+      border: 1px dashed #a8b3c1;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.8);
+      color: var(--muted);
+      text-align: center;
+    }
+
+    @media (max-width: 860px) {
+      main {
+        width: min(100% - 24px, 760px);
+        padding: 20px 0;
+      }
+
+      header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .viewer,
+      .canvas-wrap {
+        min-height: 360px;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .actions,
+      .summary {
+        grid-template-columns: 1fr;
+      }
+
+      .actions {
+        flex-direction: column;
+      }
+
+      button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>Civic Issues Detector</h1>
+        <p>Upload a street or waste image and review the AI detections directly on the photo.</p>
+      </div>
+      <div class="api-pill" aria-live="polite">
+        <span id="apiDot" class="status-dot"></span>
+        <span id="apiStatus">Checking API</span>
+      </div>
+    </header>
+
+    <section class="layout" aria-label="Detector workspace">
+      <aside class="panel">
+        <label class="field-label" for="imageInput">Image</label>
+        <label class="file-picker" for="imageInput">
+          <input id="imageInput" type="file" accept="image/*">
+          <span class="file-icon" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <path d="M12 16V4m0 0 4 4m-4-4L8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M20 16.5V18a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-1.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span class="file-main">Choose a photo</span>
+          <span id="fileName" class="file-sub">JPEG, PNG, or WebP</span>
+        </label>
+
+        <div class="actions">
+          <button id="analyzeButton" type="button">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M14 4h6v6M20 4l-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M10 6H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            Analyze
+          </button>
+          <button id="clearButton" class="secondary-button" type="button">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7l1-3h4l1 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Clear
+          </button>
+        </div>
+
+        <div id="status" class="status" role="status" aria-live="polite">Waiting for image.</div>
+
+        <div class="summary" aria-label="Analysis summary">
+          <div class="metric">
+            <span>Issues</span>
+            <strong id="issueCount">0</strong>
+          </div>
+          <div class="metric">
+            <span>Top confidence</span>
+            <strong id="topConfidence">0%</strong>
+          </div>
+        </div>
+
+        <div class="detections">
+          <h2>Detections</h2>
+          <div id="detectionList" class="detection-list">
+            <div class="detection-item">
+              <span class="detection-name">No detections yet</span>
+              <span class="confidence">-</span>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <section class="viewer" aria-label="Annotated image">
+        <div class="canvas-wrap">
+          <canvas id="outputCanvas"></canvas>
+          <div id="emptyState" class="empty-state">The analyzed image will appear here with detection boxes.</div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    const API_BASE_URL = "http://127.0.0.1:8000";
+    const boxColors = ["#d9480f", "#176b5b", "#2563eb", "#7c3aed", "#b42318", "#0f766e"];
+
+    const imageInput = document.getElementById("imageInput");
+    const analyzeButton = document.getElementById("analyzeButton");
+    const clearButton = document.getElementById("clearButton");
+    const fileName = document.getElementById("fileName");
+    const statusText = document.getElementById("status");
+    const apiDot = document.getElementById("apiDot");
+    const apiStatus = document.getElementById("apiStatus");
+    const canvas = document.getElementById("outputCanvas");
+    const emptyState = document.getElementById("emptyState");
+    const issueCount = document.getElementById("issueCount");
+    const topConfidence = document.getElementById("topConfidence");
+    const detectionList = document.getElementById("detectionList");
+
+    imageInput.addEventListener("change", () => {
+      const file = imageInput.files[0];
+      fileName.textContent = file ? file.name : "JPEG, PNG, or WebP";
+      setStatus(file ? "Ready to analyze." : "Waiting for image.", "");
+      if (file) {
+        drawImageOnly(file);
+      }
+    });
+
+    analyzeButton.addEventListener("click", analyzeImage);
+    clearButton.addEventListener("click", clearResults);
+
+    async function checkApi() {
+      try {
+        const response = await fetch(`${API_BASE_URL}/health`);
+        if (!response.ok) {
+          throw new Error("Health check failed");
+        }
+        apiDot.className = "status-dot ready";
+        apiStatus.textContent = "API online";
+      } catch (error) {
+        apiDot.className = "status-dot error";
+        apiStatus.textContent = "API offline";
+      }
+    }
+
+    async function analyzeImage() {
+      const file = imageInput.files[0];
+
+      if (!file) {
+        setStatus("Please select an image first.", "error");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      analyzeButton.disabled = true;
+      setStatus("Sending image to the AI model.", "");
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/predict`, {
+          method: "POST",
+          body: formData
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(errorText || "Server failed to process image");
+        }
+
+        const data = await response.json();
+        const detections = Array.isArray(data.detections) ? data.detections : [];
+
+        setStatus(`Analysis complete. Found ${detections.length} issue(s).`, "success");
+        updateSummary(detections);
+        renderDetectionList(detections);
+        drawResults(file, detections);
+      } catch (error) {
+        console.error(error);
+        setStatus("Error connecting to the server. Confirm FastAPI is running on port 8000.", "error");
+      } finally {
+        analyzeButton.disabled = false;
+      }
+    }
+
+    function drawImageOnly(file) {
+      const img = new Image();
+      img.onload = () => {
+        const ctx = canvas.getContext("2d");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0);
+        canvas.style.display = "block";
+        emptyState.style.display = "none";
+        URL.revokeObjectURL(img.src);
+      };
+      img.src = URL.createObjectURL(file);
+    }
+
+    function drawResults(file, detections) {
+      const img = new Image();
+      img.onload = () => {
+        const ctx = canvas.getContext("2d");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0);
+
+        detections.forEach((det, index) => {
+          const [x1, y1, x2, y2] = det.bbox.map(Number);
+          const width = Math.max(0, x2 - x1);
+          const height = Math.max(0, y2 - y1);
+          const color = boxColors[index % boxColors.length];
+          const scaleFactor = Math.max(1, canvas.width / 900);
+          const lineWidth = Math.max(3, 4 * scaleFactor);
+          const fontSize = Math.max(16, 20 * scaleFactor);
+          const label = `${det.class} (${Math.round(det.confidence * 100)}%)`;
+
+          ctx.strokeStyle = color;
+          ctx.lineWidth = lineWidth;
+          ctx.strokeRect(x1, y1, width, height);
+
+          ctx.font = `700 ${fontSize}px Segoe UI, Arial, sans-serif`;
+          const labelPaddingX = 10 * scaleFactor;
+          const labelPaddingY = 6 * scaleFactor;
+          const labelWidth = ctx.measureText(label).width + labelPaddingX * 2;
+          const labelHeight = fontSize + labelPaddingY * 2;
+          const labelX = Math.max(0, Math.min(x1 - lineWidth / 2, canvas.width - labelWidth));
+          const labelY = y1 - labelHeight - lineWidth > 0 ? y1 - labelHeight - lineWidth : y1 + lineWidth;
+
+          ctx.fillStyle = color;
+          ctx.fillRect(labelX, labelY, labelWidth, labelHeight);
+          ctx.fillStyle = "#ffffff";
+          ctx.fillText(label, labelX + labelPaddingX, labelY + labelPaddingY + fontSize * 0.82);
+        });
+
+        canvas.style.display = "block";
+        emptyState.style.display = "none";
+        URL.revokeObjectURL(img.src);
+      };
+      img.src = URL.createObjectURL(file);
+    }
+
+    function updateSummary(detections) {
+      const bestConfidence = detections.reduce((best, det) => Math.max(best, Number(det.confidence) || 0), 0);
+      issueCount.textContent = detections.length.toString();
+      topConfidence.textContent = `${Math.round(bestConfidence * 100)}%`;
+    }
+
+    function renderDetectionList(detections) {
+      if (!detections.length) {
+        detectionList.innerHTML = `
+          <div class="detection-item">
+            <span class="detection-name">No issues detected</span>
+            <span class="confidence">0%</span>
+          </div>
+        `;
+        return;
+      }
+
+      detectionList.innerHTML = detections.map((det) => `
+        <div class="detection-item">
+          <span class="detection-name">${escapeHtml(det.class)}</span>
+          <span class="confidence">${Math.round(Number(det.confidence) * 100)}%</span>
+        </div>
+      `).join("");
+    }
+
+    function clearResults() {
+      imageInput.value = "";
+      fileName.textContent = "JPEG, PNG, or WebP";
+      canvas.style.display = "none";
+      emptyState.style.display = "grid";
+      updateSummary([]);
+      renderDetectionList([]);
+      setStatus("Waiting for image.", "");
+    }
+
+    function setStatus(message, type) {
+      statusText.textContent = message;
+      statusText.className = type ? `status ${type}` : "status";
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+      })[char]);
+    }
+
+    checkApi();
+  </script>
+</body>
+</html>
