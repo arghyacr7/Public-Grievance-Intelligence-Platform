@@ -31,6 +31,7 @@ export default function Dashboard() {
   const [complaints, setComplaints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedComplaint, setSelectedComplaint] = useState(null);
+  const [notes, setNotes] = useState('');
   const [activeTab, setActiveTab] = useState('Dashboard');
   
   const navigate = useNavigate();
@@ -61,17 +62,78 @@ export default function Dashboard() {
     navigate('/auth');
   };
 
+  useEffect(() => {
+    if (selectedComplaint) {
+      setNotes(selectedComplaint.officer_notes || '');
+    }
+  }, [selectedComplaint]);
+
+  const handleSaveNotes = async () => {
+    if (!selectedComplaint) return;
+    try {
+      await api.updateNotes(selectedComplaint.id, notes);
+      setSelectedComplaint(prev => ({ ...prev, officer_notes: notes }));
+      setComplaints(prev => prev.map(c => c.id === selectedComplaint.id ? { ...c, officer_notes: notes } : c));
+      alert('Notes saved successfully!');
+    } catch (err) {
+      alert('Failed to save notes');
+      console.error(err);
+    }
+  };
+
   const handleDeleteComplaint = async (id) => {
     if (window.confirm("Are you sure you want to delete this complaint? This action cannot be undone.")) {
       try {
         await api.deleteComplaint(id);
-        setComplaints(prev => prev.filter(c => c.id !== id));
-        // Also update analytics if needed, but for now just let it be or it'll refresh on next load
+        setComplaints(prev => prev.map(c => c.id === id ? { ...c, is_deleted: true } : c));
       } catch (err) {
-        alert("Failed to delete complaint");
+        alert("Failed to delete complaint: " + (err.response?.data?.detail || err.message));
+        console.error("Delete error:", err);
+      }
+    }
+  };
+
+  const handleSplitCluster = async (id) => {
+    if (window.confirm("Are you sure you want to split this cluster? Duplicate reports will become individual complaints.")) {
+      try {
+        await api.splitCluster(id);
+        fetchComplaints(); // Refresh all
+        setSelectedComplaint(null);
+        alert("Cluster split successfully.");
+      } catch (err) {
+        alert("Failed to split cluster");
         console.error(err);
       }
     }
+  };
+
+
+  const activeComplaints = useMemo(() => {
+    return complaints.filter(c => !c.is_deleted);
+  }, [complaints]);
+
+  const originalComplaints = useMemo(() => {
+    return complaints.filter(c => !c.is_duplicate);
+  }, [complaints]);
+
+  const originalActiveComplaints = useMemo(() => {
+    return originalComplaints.filter(c => !c.is_deleted);
+  }, [originalComplaints]);
+
+  const getEffectivePriority = (baseSeverity, totalReports) => {
+    const severityLevels = { 'Low': 1, 'Medium': 2, 'High': 3, 'Critical': 4 };
+    let boostLevel = 1;
+    if (totalReports >= 6) boostLevel = 4;
+    else if (totalReports >= 4) boostLevel = 3;
+    else if (totalReports >= 2) boostLevel = 2;
+
+    const baseLevel = severityLevels[baseSeverity] || 1;
+    const finalLevel = Math.max(baseLevel, boostLevel);
+    
+    if (finalLevel === 4) return 'Critical';
+    if (finalLevel === 3) return 'High';
+    if (finalLevel === 2) return 'Medium';
+    return 'Low';
   };
 
   const severityData = useMemo(() => {
@@ -84,7 +146,7 @@ export default function Dashboard() {
     return [
       {
         label: 'Total Reports',
-        value: complaints.length,
+        value: activeComplaints.length,
         trend: '+12% from last month',
         icon: <svg width="24" height="24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>,
         color: '#2563EB',
@@ -92,7 +154,7 @@ export default function Dashboard() {
       },
       {
         label: 'Resolved',
-        value: complaints.filter(c => c.status === 'Resolved').length,
+        value: activeComplaints.filter(c => c.status === 'Resolved').length,
         trend: '+4% this week',
         icon: <svg width="24" height="24" fill="none" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>,
         color: '#22C55E',
@@ -108,14 +170,83 @@ export default function Dashboard() {
       },
       {
         label: 'Accepted Cases',
-        value: complaints.filter(c => c.status === 'Accepted').length,
+        value: activeComplaints.filter(c => c.status === 'Accepted').length,
         trend: '+8% steady',
         icon: <svg width="24" height="24" fill="none" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>,
         color: '#F59E0B',
         bg: '#FFFBEB',
       },
     ];
-  }, [analytics, complaints]);
+  }, [analytics, activeComplaints]);
+
+  const recentActivities = useMemo(() => {
+    if (!activeComplaints || activeComplaints.length === 0) return [];
+    
+    return activeComplaints.map(c => {
+      const parseApiDate = (val) => {
+        if (!val) return null;
+        if (typeof val === 'string' && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(val)) {
+          return new Date(`${val.replace(' ', 'T')}Z`);
+        }
+        return new Date(val);
+      };
+      const time = c.updated_at ? parseApiDate(c.updated_at) : parseApiDate(c.created_at);
+      const isNew = c.status === 'Submitted' && !c.updated_at;
+      
+      let title = '';
+      let desc = '';
+      let color = '';
+      
+      if (isNew) {
+        title = `Complaint #${c.id} Reported`;
+        desc = `Citizen reported a ${c.severity?.toLowerCase() || ''} ${c.category?.toLowerCase() || 'issue'}.`;
+        color = SHADCN.primary;
+      } else if (c.status === 'Resolved') {
+        title = `Complaint #${c.id} Resolved`;
+        desc = `The issue has been marked as resolved.`;
+        color = SEVERITY_COLORS.Low;
+      } else {
+        title = `Status Updated`;
+        desc = `Complaint #${c.id} marked as '${c.status}'.`;
+        color = SEVERITY_COLORS.High;
+      }
+      
+      return { id: c.id, time, title, desc, color };
+    }).sort((a, b) => b.time - a.time).slice(0, 4);
+  }, [complaints]);
+
+  const timeAgo = (date) => {
+    const seconds = Math.floor((new Date() - date) / 1000);
+    let interval = seconds / 31536000;
+    if (interval > 1) return Math.floor(interval) + " years ago";
+    interval = seconds / 2592000;
+    if (interval > 1) return Math.floor(interval) + " months ago";
+    interval = seconds / 86400;
+    if (interval > 1) return Math.floor(interval) + " days ago";
+    interval = seconds / 3600;
+    if (interval > 1) return Math.floor(interval) + " hours ago";
+    interval = seconds / 60;
+    if (interval >= 1) return Math.floor(interval) + " mins ago";
+    return "Just now";
+  };
+
+  const parseApiDate = (val) => {
+    if (!val) return null;
+    if (typeof val === 'string' && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(val)) {
+      return new Date(`${val.replace(' ', 'T')}Z`);
+    }
+    return new Date(val);
+  };
+
+  const clusterDuplicates = useMemo(() => {
+    if (!selectedComplaint) return [];
+    return complaints.filter(dup => dup.is_duplicate && dup.duplicate_of === selectedComplaint.id);
+  }, [selectedComplaint, complaints]);
+
+  const isCluster = selectedComplaint && clusterDuplicates.length > 0;
+  const totalClusterReports = isCluster ? clusterDuplicates.length + 1 : 1;
+  const effectiveSeverity = selectedComplaint ? getEffectivePriority(selectedComplaint.severity, totalClusterReports) : 'Low';
+  const isUpgraded = selectedComplaint && effectiveSeverity !== selectedComplaint.severity;
 
   if (loading) {
     return (
@@ -184,19 +315,6 @@ export default function Dashboard() {
             <span style={{ color: SHADCN.muted, marginRight: '0.5rem', display: 'flex' }}><SearchIcon /></span>
             <input type="text" placeholder="Search complaints..." style={{ background: 'transparent', border: 'none', outline: 'none', fontSize: '14px', width: '100%', color: SHADCN.text }} />
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <div style={{ position: 'relative', cursor: 'pointer', color: SHADCN.muted }}>
-              <BellIcon />
-              <span style={{ position: 'absolute', top: '-2px', right: '-2px', background: SHADCN.primary, color: 'white', fontSize: '10px', fontWeight: 'bold', width: '14px', height: '14px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>3</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px' }}>👨🏻‍💼</div>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontWeight: 600, color: SHADCN.text, fontSize: '14px', lineHeight: 1.1 }}>Arghyadeep Das</span>
-                <span style={{ color: SHADCN.muted, fontSize: '12px' }}>Field Officer</span>
-              </div>
-            </div>
-          </div>
         </header>
 
         {/* DYNAMIC DASHBOARD CONTENT */}
@@ -236,7 +354,7 @@ export default function Dashboard() {
                 <h3 style={{ fontSize: '20px', fontWeight: 600, margin: 0, color: SHADCN.text }}>Interactive Complaint Map</h3>
               </div>
               <div style={{ height: '250px', position: 'relative', borderBottomLeftRadius: '10px', borderBottomRightRadius: '10px', overflow: 'hidden' }}>
-                <MapView complaints={complaints} />
+                <MapView complaints={originalComplaints} />
                 
                 {/* Map Legend Overlay */}
                 <div style={{ position: 'absolute', bottom: '0.75rem', right: '0.75rem', background: 'rgba(255,255,255,0.95)', padding: '0.5rem 0.75rem', borderRadius: '6px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', border: `1px solid ${SHADCN.border}`, zIndex: 1000, fontSize: '13px', fontWeight: 600 }}>
@@ -309,10 +427,19 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {complaints.slice(0, 8).map(c => (
+                    {originalActiveComplaints.slice(0, 8).map(c => {
+                      const duplicateCount = complaints.filter(dup => dup.is_duplicate && dup.duplicate_of === c.id).length;
+                      return (
                       <tr key={c.id} style={{ borderBottom: `1px solid ${SHADCN.border}` }}>
                         <td style={{ padding: '0.5rem 0.75rem', color: SHADCN.muted, fontWeight: 600 }}>#{c.id}</td>
-                        <td style={{ padding: '0.5rem 0.75rem', fontWeight: 600, color: SHADCN.text }}>{c.title.length > 25 ? c.title.substring(0,25)+'...' : c.title}</td>
+                        <td style={{ padding: '0.5rem 0.75rem', fontWeight: 600, color: SHADCN.text }}>
+                          {c.title.length > 25 ? c.title.substring(0,25)+'...' : c.title}
+                          {duplicateCount > 0 && (
+                            <span style={{ marginLeft: '0.5rem', padding: '0.15rem 0.4rem', borderRadius: '4px', background: 'linear-gradient(135deg, #2563EB, #7C3AED)', color: 'white', fontSize: '11px', fontWeight: 700, border: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              👥 {duplicateCount + 1} Reports
+                            </span>
+                          )}
+                        </td>
                         <td style={{ padding: '0.5rem 0.75rem', color: SHADCN.muted, fontWeight: 500 }}>{c.submitted_by || 'Anonymous'}</td>
                         <td style={{ padding: '0.5rem 0.75rem', color: SHADCN.muted, fontWeight: 500 }}>{c.category}</td>
                         <td style={{ padding: '0.5rem 0.75rem' }}>
@@ -334,7 +461,13 @@ export default function Dashboard() {
                           </span>
                         </td>
                         <td style={{ padding: '0.5rem 0.75rem', color: SHADCN.muted, fontSize: '13px', fontWeight: 500 }}>
-                          {new Date(c.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          {(() => {
+                            let val = c.created_at;
+                            if (typeof val === 'string' && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(val)) {
+                              val = `${val.replace(' ', 'T')}Z`;
+                            }
+                            return new Date(val).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                          })()}
                         </td>
                         <td style={{ padding: '0.5rem 0.75rem' }}>
                           <button onClick={() => setSelectedComplaint(c)} style={{ background: '#fff', border: `1px solid ${SHADCN.border}`, borderRadius: '6px', padding: '0.3rem 0.6rem', fontSize: '13px', fontWeight: 600, color: SHADCN.text, cursor: 'pointer', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
@@ -342,8 +475,9 @@ export default function Dashboard() {
                           </button>
                         </td>
                       </tr>
-                    ))}
-                    {complaints.length === 0 && (
+                      );
+                    })}
+                    {originalComplaints.length === 0 && (
                       <tr><td colSpan="7" style={{ textAlign: 'center', padding: '1.5rem', color: SHADCN.muted, fontSize: '14px' }}>No reports yet.</td></tr>
                     )}
                   </tbody>
@@ -358,32 +492,20 @@ export default function Dashboard() {
               </div>
               <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', flex: 1 }}>
                 
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: SHADCN.primary, marginTop: '4px' }} />
-                  <div>
-                    <p style={{ fontSize: '14px', fontWeight: 600, color: SHADCN.text, margin: '0 0 0.1rem' }}>Complaint #102 Reported</p>
-                    <p style={{ fontSize: '13px', color: SHADCN.muted, margin: 0 }}>Citizen reported a critical pothole on MG Road.</p>
-                    <p style={{ fontSize: '11px', color: '#94A3B8', margin: '0.15rem 0 0', fontWeight: 500 }}>10 mins ago</p>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: SEVERITY_COLORS.Low, marginTop: '4px' }} />
-                  <div>
-                    <p style={{ fontSize: '14px', fontWeight: 600, color: SHADCN.text, margin: '0 0 0.1rem' }}>Officer Assigned</p>
-                    <p style={{ fontSize: '13px', color: SHADCN.muted, margin: 0 }}>Arghyadeep Das assigned to Complaint #98.</p>
-                    <p style={{ fontSize: '11px', color: '#94A3B8', margin: '0.15rem 0 0', fontWeight: 500 }}>45 mins ago</p>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: SEVERITY_COLORS.High, marginTop: '4px' }} />
-                  <div>
-                    <p style={{ fontSize: '14px', fontWeight: 600, color: SHADCN.text, margin: '0 0 0.1rem' }}>Status Updated</p>
-                    <p style={{ fontSize: '13px', color: SHADCN.muted, margin: 0 }}>Complaint #95 marked as 'In Progress'.</p>
-                    <p style={{ fontSize: '11px', color: '#94A3B8', margin: '0.15rem 0 0', fontWeight: 500 }}>2 hours ago</p>
-                  </div>
-                </div>
+                {recentActivities.length === 0 ? (
+                  <div style={{ color: SHADCN.muted, fontSize: '13px' }}>No recent activity.</div>
+                ) : (
+                  recentActivities.map((act, i) => (
+                    <div key={`${act.id}-${i}`} style={{ display: 'flex', gap: '0.5rem' }}>
+                      <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: act.color, marginTop: '4px' }} />
+                      <div>
+                        <p style={{ fontSize: '14px', fontWeight: 600, color: SHADCN.text, margin: '0 0 0.1rem' }}>{act.title}</p>
+                        <p style={{ fontSize: '13px', color: SHADCN.muted, margin: 0 }}>{act.desc}</p>
+                        <p style={{ fontSize: '11px', color: '#94A3B8', margin: '0.15rem 0 0', fontWeight: 500 }}>{timeAgo(act.time)}</p>
+                      </div>
+                    </div>
+                  ))
+                )}
 
               </div>
             </div>
@@ -399,7 +521,7 @@ export default function Dashboard() {
                 <p style={{ color: SHADCN.muted, fontSize: '14px', margin: 0 }}>Explore complaints interactively on a full-size map.</p>
               </div>
               <div style={{ flex: 1, background: SHADCN.card, border: `1px solid ${SHADCN.border}`, borderRadius: '10px', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)', position: 'relative', overflow: 'hidden', minHeight: '500px' }}>
-                <MapView complaints={complaints} />
+                <MapView complaints={originalActiveComplaints} />
                 <div style={{ position: 'absolute', bottom: '1rem', right: '1rem', background: 'rgba(255,255,255,0.95)', padding: '0.5rem 0.75rem', borderRadius: '6px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', border: `1px solid ${SHADCN.border}`, zIndex: 1000, fontSize: '13px', fontWeight: 600 }}>
                   <div style={{ marginBottom: '0.25rem', color: SHADCN.muted }}>Severity Legend</div>
                   {Object.entries(SEVERITY_COLORS).map(([sev, col]) => (
@@ -420,15 +542,27 @@ export default function Dashboard() {
               </div>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {complaints.map(c => (
-                  <div key={c.id} style={{ background: SHADCN.card, border: `1px solid ${SHADCN.border}`, borderRadius: '10px', padding: '1rem', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                {originalComplaints.map(c => {
+                  const duplicateCount = complaints.filter(dup => dup.is_duplicate && dup.duplicate_of === c.id).length;
+                  return (
+                  <div key={c.id} style={{ opacity: c.is_deleted ? 0.6 : 1, background: c.is_deleted ? '#F8FAFC' : SHADCN.card, border: `1px solid ${SHADCN.border}`, borderRadius: '10px', padding: '1rem', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
                         <span style={{ fontSize: '13px', fontWeight: 700, color: SHADCN.muted, background: '#F1F5F9', padding: '0.15rem 0.5rem', borderRadius: '4px' }}>
                           ID: #{c.id}
                         </span>
-                        <h3 style={{ fontSize: '16px', fontWeight: 600, color: SHADCN.text, margin: 0 }}>
+                        {c.is_deleted && (
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: '#DC2626', background: '#FEE2E2', padding: '0.15rem 0.5rem', borderRadius: '4px' }}>
+                            DELETED
+                          </span>
+                        )}
+                        <h3 style={{ fontSize: '16px', fontWeight: 600, color: c.is_deleted ? SHADCN.muted : SHADCN.text, margin: 0, textDecoration: c.is_deleted ? 'line-through' : 'none' }}>
                           {c.title}
+                          {duplicateCount > 0 && !c.is_deleted && (
+                            <span style={{ marginLeft: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '6px', background: 'linear-gradient(135deg, #2563EB, #7C3AED)', color: 'white', fontSize: '12px', fontWeight: 700, border: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              🚨 COMMUNITY REPORTED
+                            </span>
+                          )}
                         </h3>
                         <span style={{ fontSize: '12px', fontWeight: 500, color: SHADCN.muted, background: '#FEF2F2', padding: '0.15rem 0.5rem', borderRadius: '4px', border: '1px solid #FEE2E2' }}>
                           By: {c.submitted_by || 'Anonymous'}
@@ -447,16 +581,18 @@ export default function Dashboard() {
                         View Details
                       </button>
                       <button 
-                        onClick={() => handleDeleteComplaint(c.id)} 
-                        style={{ background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: '6px', padding: '0.4rem 0.8rem', fontSize: '13px', fontWeight: 600, color: '#EF4444', cursor: 'pointer', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}
+                        onClick={() => !c.is_deleted && handleDeleteComplaint(c.id)} 
+                        disabled={c.is_deleted}
+                        style={{ background: c.is_deleted ? '#F1F5F9' : '#FEF2F2', border: c.is_deleted ? `1px solid ${SHADCN.border}` : '1px solid #FCA5A5', borderRadius: '6px', padding: '0.4rem 0.8rem', fontSize: '13px', fontWeight: 600, color: c.is_deleted ? SHADCN.muted : '#EF4444', cursor: c.is_deleted ? 'not-allowed' : 'pointer', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}
                       >
-                        Delete
+                        {c.is_deleted ? 'Deleted' : 'Delete'}
                       </button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
                 
-                {complaints.length === 0 && (
+                {originalComplaints.length === 0 && (
                   <div style={{ textAlign: 'center', padding: '3rem', color: SHADCN.muted, border: `1px dashed ${SHADCN.border}`, borderRadius: '10px' }}>
                     No reports found.
                   </div>
@@ -483,65 +619,187 @@ export default function Dashboard() {
           <div style={{ position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(2px)' }} onClick={() => setSelectedComplaint(null)} />
           
           {/* Drawer Panel */}
-          <div style={{ width: '380px', background: SHADCN.card, height: '100%', position: 'relative', zIndex: 101, boxShadow: '-4px 0 20px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column', animation: 'slideInRight 0.25s ease-out' }}>
+          <div style={{ width: '420px', background: SHADCN.card, height: '100%', position: 'relative', zIndex: 101, boxShadow: '-4px 0 20px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column', animation: 'slideInRight 0.25s ease-out' }}>
             
-            <div style={{ padding: '1rem 1.25rem', borderBottom: `1px solid ${SHADCN.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ fontSize: '20px', fontWeight: 600, margin: 0, color: SHADCN.text }}>Complaint Details</h2>
+            <div style={{ padding: '1rem 1.25rem', borderBottom: `1px solid ${SHADCN.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: isCluster ? '#F8FAFC' : 'transparent' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0, color: SHADCN.text, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                {isCluster ? 'Duplicate Complaint Cluster' : 'Complaint Details'}
+                {isCluster && <span style={{ background: 'linear-gradient(135deg, #2563EB, #7C3AED)', color: 'white', padding: '0.15rem 0.4rem', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>CLUSTER</span>}
+              </h2>
               <button onClick={() => setSelectedComplaint(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: SHADCN.muted }}><CloseIcon /></button>
             </div>
 
-            <div style={{ padding: '1.25rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ padding: '1.25rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               
-              {/* Image */}
+              {/* Image & Map Details (Standard) */}
               <div>
-                <span style={{ fontSize: '12px', fontWeight: 700, color: SHADCN.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Evidence</span>
-                <div style={{ marginTop: '0.4rem', borderRadius: '8px', overflow: 'hidden', border: `1px solid ${SHADCN.border}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '0.4rem' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 700, color: SHADCN.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Evidence</span>
+                  {isCluster && (
+                    <span style={{ fontSize: '12px', color: '#10B981', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                      <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                      98.4% Match
+                    </span>
+                  )}
+                </div>
+                <div style={{ borderRadius: '8px', overflow: 'hidden', border: `1px solid ${SHADCN.border}`, position: 'relative' }}>
                   <img src={selectedComplaint.image_path.includes('http') ? selectedComplaint.image_path : `${API_BASE_URL}/${selectedComplaint.image_path.replace(/\\/g, '/')}`} alt="Complaint Evidence" style={{ width: '100%', height: 'auto', display: 'block' }} />
+                  {isCluster && (
+                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(4px)', padding: '0.5rem', display: 'flex', justifyContent: 'space-around', color: 'white', fontSize: '11px', fontWeight: 600 }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>📍 Same Location</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>📸 Similar Image</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>🤖 Same Category</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
               {/* Info grid */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <span style={{ fontSize: '12px', fontWeight: 700, color: SHADCN.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>ID</span>
-                  <p style={{ fontSize: '16px', fontWeight: 600, margin: '0.15rem 0 0', color: SHADCN.text }}>#{selectedComplaint.id}</p>
+                <div style={{ background: '#F8FAFC', padding: '0.75rem', borderRadius: '8px', border: `1px solid ${SHADCN.border}` }}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: SHADCN.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Impact</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0.25rem 0 0' }}>
+                    <span style={{ fontSize: '20px', fontWeight: 700, color: SHADCN.text }}>{totalClusterReports}</span>
+                    <span style={{ fontSize: '12px', color: SHADCN.muted, fontWeight: 500, lineHeight: 1.1 }}>Citizens<br/>Affected</span>
+                  </div>
                 </div>
-                <div>
-                  <span style={{ fontSize: '12px', fontWeight: 700, color: SHADCN.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Severity</span>
-                  <p style={{ margin: '0.15rem 0 0' }}>
-                    <span style={{ padding: '0.15rem 0.5rem', borderRadius: '999px', fontSize: '12px', fontWeight: 700, background: selectedComplaint.severity === 'Critical' ? '#FEF2F2' : '#F0FDF4', color: SEVERITY_COLORS[selectedComplaint.severity] || SHADCN.muted, border: `1px solid ${selectedComplaint.severity === 'Critical' ? '#FCA5A5' : '#86EFAC'}` }}>
-                      {selectedComplaint.severity}
+                <div style={{ background: isUpgraded ? '#FEF2F2' : '#F8FAFC', padding: '0.75rem', borderRadius: '8px', border: `1px solid ${isUpgraded ? '#FECACA' : SHADCN.border}` }}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: isUpgraded ? '#EF4444' : SHADCN.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Priority {isUpgraded && 'Boost'}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0.25rem 0 0' }}>
+                    <span style={{ 
+                      padding: '0.15rem 0.5rem', borderRadius: '4px', fontSize: '12px', fontWeight: 700, 
+                      background: effectiveSeverity === 'Critical' ? '#EF4444' : effectiveSeverity === 'High' ? '#F59E0B' : '#22C55E', 
+                      color: 'white' 
+                    }}>
+                      {effectiveSeverity}
                     </span>
-                  </p>
+                    {isUpgraded && (
+                      <span style={{ fontSize: '11px', color: '#EF4444', fontWeight: 600 }}>↑ from {selectedComplaint.severity}</span>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* Title & Desc */}
-              <div>
-                <span style={{ fontSize: '12px', fontWeight: 700, color: SHADCN.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>AI Title</span>
-                <p style={{ fontSize: '16px', fontWeight: 600, margin: '0.15rem 0 0', color: SHADCN.text, lineHeight: 1.4 }}>{selectedComplaint.title}</p>
-              </div>
+              {/* Cluster Reports List */}
+              {isCluster && (
+                <div>
+                  <span style={{ fontSize: '12px', fontWeight: 700, color: SHADCN.muted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem', display: 'block' }}>Clustered Reports</span>
+                  
+                  {/* Primary Report */}
+                  <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '8px', padding: '0.75rem', marginBottom: '0.5rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#1D4ED8' }}>Primary Report (ID #{selectedComplaint.id})</span>
+                      <span style={{ fontSize: '11px', color: '#3B82F6', fontWeight: 600 }}>{parseApiDate(selectedComplaint.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                    </div>
+                    <div style={{ fontSize: '13px', color: '#1E3A8A', fontWeight: 500 }}>
+                      Reported by: <span style={{ fontWeight: 600 }}>{selectedComplaint.submitted_by || 'Anonymous'}</span>
+                    </div>
+                  </div>
 
-              <div>
-                <span style={{ fontSize: '12px', fontWeight: 700, color: SHADCN.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Description</span>
-                <p style={{ fontSize: '14px', color: SHADCN.muted, lineHeight: 1.5, margin: '0.15rem 0 0', fontWeight: 500 }}>{selectedComplaint.description}</p>
-              </div>
+                  {/* Secondary Reports */}
+                  {clusterDuplicates.map(dup => (
+                    <div key={dup.id} style={{ border: `1px solid ${SHADCN.border}`, borderRadius: '8px', padding: '0.75rem', marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between' }}>
+                      <div>
+                        <span style={{ fontSize: '12px', fontWeight: 600, color: SHADCN.text, display: 'block' }}>Report #{dup.id}</span>
+                        <span style={{ fontSize: '12px', color: SHADCN.muted }}>By: {dup.submitted_by || 'Anonymous'}</span>
+                      </div>
+                      <span style={{ fontSize: '11px', color: SHADCN.muted, fontWeight: 500 }}>
+                        {parseApiDate(dup.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
 
-              <div>
-                <span style={{ fontSize: '12px', fontWeight: 700, color: SHADCN.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Coordinates</span>
-                <p style={{ fontSize: '14px', fontWeight: 600, margin: '0.15rem 0 0', color: SHADCN.text }}>{selectedComplaint.latitude}, {selectedComplaint.longitude}</p>
-              </div>
+              {/* Detailed Context (Only for primary/single) */}
+              {!isCluster && (
+                <>
+                  <div>
+                    <span style={{ fontSize: '12px', fontWeight: 700, color: SHADCN.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>AI Title</span>
+                    <p style={{ fontSize: '16px', fontWeight: 600, margin: '0.15rem 0 0', color: SHADCN.text, lineHeight: 1.4 }}>{selectedComplaint.title}</p>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '12px', fontWeight: 700, color: SHADCN.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Description</span>
+                    <p style={{ fontSize: '14px', color: SHADCN.muted, lineHeight: 1.5, margin: '0.15rem 0 0', fontWeight: 500 }}>{selectedComplaint.description}</p>
+                  </div>
+                </>
+              )}
+              
+              {isCluster && (
+                <div style={{ borderTop: `1px solid ${SHADCN.border}`, paddingTop: '1rem', marginTop: '0.5rem' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 700, color: SHADCN.muted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem', display: 'block' }}>Complaint Activity</span>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', position: 'relative' }}>
+                    <div style={{ position: 'absolute', left: '6px', top: '6px', bottom: '6px', width: '2px', background: '#E2E8F0', zIndex: 0 }} />
+                    
+                    {/* Activity 1 */}
+                    <div style={{ display: 'flex', gap: '0.75rem', zIndex: 1, position: 'relative' }}>
+                      <div style={{ width: '14px', height: '14px', borderRadius: '50%', background: '#fff', border: '2px solid #3B82F6', marginTop: '2px', flexShrink: 0 }} />
+                      <div>
+                        <div style={{ fontSize: '13px', fontWeight: 600, color: SHADCN.text }}>{selectedComplaint.submitted_by || 'Citizen'} submitted report</div>
+                        <div style={{ fontSize: '11px', color: SHADCN.muted }}>{parseApiDate(selectedComplaint.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                      </div>
+                    </div>
 
-              {/* Officer Notes Mock */}
-              <div style={{ background: '#F8FAFC', border: `1px solid ${SHADCN.border}`, borderRadius: '8px', padding: '1rem', marginTop: '0.25rem' }}>
+                    {/* Activity 2 (duplicates) */}
+                    {clusterDuplicates.map(dup => (
+                      <div key={'act'+dup.id} style={{ display: 'flex', gap: '0.75rem', zIndex: 1, position: 'relative' }}>
+                        <div style={{ width: '14px', height: '14px', borderRadius: '50%', background: '#fff', border: '2px solid #94A3B8', marginTop: '2px', flexShrink: 0 }} />
+                        <div>
+                          <div style={{ fontSize: '13px', fontWeight: 500, color: SHADCN.text }}>{dup.submitted_by || 'Citizen'} submitted similar report</div>
+                          <div style={{ fontSize: '11px', color: SHADCN.muted }}>{parseApiDate(dup.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Merge event */}
+                    <div style={{ display: 'flex', gap: '0.75rem', zIndex: 1, position: 'relative', marginTop: '0.25rem' }}>
+                      <div style={{ width: '14px', height: '14px', borderRadius: '50%', background: '#8B5CF6', border: '2px solid #fff', boxShadow: '0 0 0 2px #8B5CF6', marginTop: '2px', flexShrink: 0 }} />
+                      <div>
+                        <div style={{ fontSize: '13px', fontWeight: 600, color: '#7C3AED' }}>🤖 AI merged duplicate complaints</div>
+                      </div>
+                    </div>
+
+                    {/* Upgrade event */}
+                    {isUpgraded && (
+                      <div style={{ display: 'flex', gap: '0.75rem', zIndex: 1, position: 'relative', marginTop: '0.25rem' }}>
+                        <div style={{ width: '14px', height: '14px', borderRadius: '50%', background: '#EF4444', border: '2px solid #fff', boxShadow: '0 0 0 2px #EF4444', marginTop: '2px', flexShrink: 0 }} />
+                        <div>
+                          <div style={{ fontSize: '13px', fontWeight: 600, color: '#DC2626' }}>⚡ Priority upgraded to {effectiveSeverity}</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Officer Notes & Actions */}
+              <div style={{ background: '#F8FAFC', border: `1px solid ${SHADCN.border}`, borderRadius: '8px', padding: '1rem', marginTop: 'auto' }}>
                 <span style={{ fontSize: '12px', fontWeight: 700, color: SHADCN.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Officer Notes</span>
                 <textarea 
                   placeholder="Add resolution notes here..." 
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
                   style={{ width: '100%', minHeight: '60px', marginTop: '0.5rem', padding: '0.5rem 0.75rem', borderRadius: '6px', border: `1px solid ${SHADCN.border}`, fontSize: '14px', outline: 'none', resize: 'vertical', fontFamily: 'inherit', fontWeight: 500 }}
                 />
-                <button onClick={() => alert('Notes saved successfully!')} style={{ marginTop: '0.5rem', width: '100%', background: SHADCN.primary, color: 'white', border: 'none', borderRadius: '6px', padding: '0.5rem', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>
+                <button onClick={handleSaveNotes} style={{ marginTop: '0.5rem', width: '100%', background: SHADCN.primary, color: 'white', border: 'none', borderRadius: '6px', padding: '0.5rem', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>
                   Save Notes
                 </button>
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                  {isCluster && (
+                    <button onClick={() => handleSplitCluster(selectedComplaint.id)} style={{ flex: 1, background: '#fff', color: SHADCN.text, border: `1px solid ${SHADCN.border}`, borderRadius: '6px', padding: '0.5rem', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+                      Split Cluster
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => {
+                      handleDeleteComplaint(selectedComplaint.id);
+                      setSelectedComplaint(null);
+                    }} 
+                    style={{ flex: 1, background: '#FEF2F2', color: '#EF4444', border: '1px solid #FCA5A5', borderRadius: '6px', padding: '0.5rem', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+                    {isCluster ? 'Delete Cluster' : 'Delete Report'}
+                  </button>
+                </div>
               </div>
 
             </div>

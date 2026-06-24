@@ -1,6 +1,6 @@
-train: C:\Users\iamar\Downloads\civic_issues_backend\grievance_models\pothole_seg_dataset\Pothole_Segmentation_YOLOv8\train\images
-val: C:\Users\iamar\Downloads\civic_issues_backend\grievance_models\pothole_seg_dataset\Pothole_Segmentation_YOLOv8\valid\images
-
+path: c:\Users\iamar\Downloads\civic_issues_backend\grievance_models\pothole_seg_dataset\Pothole_Segmentation_YOLOv8
+train: train\images
+val: valid\images
 nc: 1
 names: ['Pothole']
 

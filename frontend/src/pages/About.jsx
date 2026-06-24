@@ -89,64 +89,6 @@ export default function About() {
             </div>
           </div>
 
-          {/* Project Information */}
-          <div style={{ background: COLOR.card, borderRadius: '16px', border: `1px solid ${COLOR.border}`, overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-            <div style={{ background: COLOR.primary, padding: '0.75rem 1.25rem', color: 'white', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-              <h2 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'white' }}>Project Information</h2>
-            </div>
-            <div style={{ padding: '0.5rem 0' }}>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: '40% 60%', padding: '0.75rem 1.25rem', borderBottom: `1px solid ${COLOR.border}` }}>
-                <span style={{ color: COLOR.muted, fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
-                  Project Title
-                </span>
-                <span style={{ color: COLOR.text, fontSize: '0.9rem', fontWeight: 500, lineHeight: 1.4 }}>Public Grievance Intelligence Platform: An AI-Powered Civic Issue Detection and Management System</span>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '40% 60%', padding: '0.75rem 1.25rem', borderBottom: `1px solid ${COLOR.border}` }}>
-                <span style={{ color: COLOR.muted, fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
-                  Project Type
-                </span>
-                <span style={{ color: COLOR.text, fontSize: '0.9rem', fontWeight: 500 }}>MCA Final Year Major Project</span>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '40% 60%', padding: '0.75rem 1.25rem', borderBottom: `1px solid ${COLOR.border}` }}>
-                <span style={{ color: COLOR.muted, fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                  Academic Session
-                </span>
-                <span style={{ color: COLOR.text, fontSize: '0.9rem', fontWeight: 500 }}>2026 – 2027</span>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '40% 60%', padding: '0.75rem 1.25rem', borderBottom: `1px solid ${COLOR.border}` }}>
-                <span style={{ color: COLOR.muted, fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-                  Department
-                </span>
-                <span style={{ color: COLOR.text, fontSize: '0.9rem', fontWeight: 500 }}>Master of Computer Applications (MCA)</span>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '40% 60%', padding: '0.75rem 1.25rem', borderBottom: `1px solid ${COLOR.border}` }}>
-                <span style={{ color: COLOR.muted, fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
-                  Institution
-                </span>
-                <span style={{ color: COLOR.text, fontSize: '0.9rem', fontWeight: 500, lineHeight: 1.4 }}>RCC Institute of Information Technology (RCCIIT)</span>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '40% 60%', padding: '0.75rem 1.25rem' }}>
-                <span style={{ color: COLOR.muted, fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                  Project Guide
-                </span>
-                <span style={{ color: COLOR.text, fontSize: '0.9rem', fontWeight: 500, lineHeight: 1.4 }}>Faculty Mentor<br/>Department of MCA</span>
-              </div>
-
-            </div>
-          </div>
 
         </div>
 
@@ -212,35 +154,6 @@ export default function About() {
             </div>
           </div>
 
-          {/* Technology Stack */}
-          <div style={{ background: COLOR.card, borderRadius: '16px', border: `1px solid ${COLOR.border}`, overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-            <div style={{ background: COLOR.primary, padding: '0.75rem 1.25rem', color: 'white', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
-              <h2 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'white' }}>Technology Stack</h2>
-            </div>
-            <div style={{ padding: '1.5rem', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
-              
-              {/* Fake Logos for Stack */}
-              {[
-                { name: 'Python', icon: '🐍', color: '#FFFBEB' },
-                { name: 'FastAPI', icon: '⚡', color: '#ECFDF5' },
-                { name: 'React.js', icon: '⚛️', color: '#EFF6FF' },
-                { name: 'PostgreSQL', icon: '🐘', color: '#F8FAFC' },
-                { name: 'YOLOv8', icon: '👁️', color: '#FFF7ED' },
-                { name: 'OpenCV', icon: '📷', color: '#F0FDF4' },
-                { name: 'Scikit-Learn', icon: '🧠', color: '#F5F3FF' },
-                { name: 'OpenStreet', icon: '🗺️', color: '#FEF2F2' },
-              ].map(tech => (
-                <div key={tech.name} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-                  <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: tech.color, border: `1px solid ${COLOR.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-                    {tech.icon}
-                  </div>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: COLOR.text, textAlign: 'center' }}>{tech.name}</span>
-                </div>
-              ))}
-
-            </div>
-          </div>
 
         </div>
 

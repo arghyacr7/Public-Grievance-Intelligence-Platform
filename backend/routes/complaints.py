@@ -11,8 +11,8 @@ from typing import List, Optional
 from PIL import Image, UnidentifiedImageError
 
 from ..database import get_db
-from ..models import Complaint, DetectionResult, User, RoleEnum
-from ..schemas import ComplaintResponse, ComplaintUpdateStatus
+from ..models import Complaint, DetectionResult, User, RoleEnum, StatusEnum
+from ..schemas import ComplaintResponse, ComplaintUpdateStatus, ComplaintUpdateNotes
 from ..auth_utils import get_current_active_user, get_current_user
 
 from ..ai.detector import detect_issues
@@ -41,14 +41,78 @@ DETECTION_CATEGORY_MAP = {
     "waterlogging": "Waterlogging",
 }
 
-def infer_category(detections: list) -> str:
-    """Infer the civic category from YOLO detections."""
-    for d in detections:
-        name_lower = d["class_name"].lower()
-        for keyword, cat in DETECTION_CATEGORY_MAP.items():
-            if keyword in name_lower:
-                return cat
+GARBAGE_KEYWORDS = [
+    "trash", "garbage", "litter", "waste", "cardboard", "plastic",
+    "bottles", "box", "debris", "dump", "rubbish", "scrap"
+]
+
+POTHOLE_KEYWORDS = [
+    "pothole", "road damage", "damaged road", "crack", "broken road",
+    "surface damage", "road surface"
+]
+
+
+def is_garbage_detection(d: dict) -> bool:
+    name = d.get("class_name", "").lower()
+    return any(keyword in name for keyword in ["garbage", "trash", "waste", "litter", "debris"])
+
+
+def is_pothole_detection(d: dict) -> bool:
+    name = d.get("class_name", "").lower()
+    return any(keyword in name for keyword in ["pothole", "road", "crack", "damage"])
+
+
+def infer_category(detections: list, image_caption: str = "", title: str = "", description: str = "") -> str:
+    """Infer the civic category from YOLO detections or text fallbacks."""
+    if detections:
+        garbage_hits = [d for d in detections if is_garbage_detection(d)]
+        pothole_hits = [d for d in detections if is_pothole_detection(d)]
+
+        # Prefer potholes when both are present, because the road hazard is the main issue.
+        if pothole_hits:
+            return "Pothole"
+        if garbage_hits:
+            return "Garbage"
+
+        for d in detections:
+            name_lower = d["class_name"].lower()
+            for keyword, cat in DETECTION_CATEGORY_MAP.items():
+                if keyword in name_lower:
+                    return cat
+
+    # Fallback to text matching if detection missed
+    text_content = f"{image_caption} {title} {description}".lower()
+    if any(keyword in text_content for keyword in GARBAGE_KEYWORDS):
+        return "Garbage"
+    if any(keyword in text_content for keyword in POTHOLE_KEYWORDS):
+        return "Pothole"
+
     return "General"
+
+
+def filter_detections_for_caption(raw_detections: list, image_caption: str) -> list:
+    """Reduce false positives by preferring detections that match the caption context."""
+    caption_lower = (image_caption or "").lower()
+
+    is_garbage_caption = any(keyword in caption_lower for keyword in GARBAGE_KEYWORDS)
+    is_pothole_caption = any(keyword in caption_lower for keyword in POTHOLE_KEYWORDS)
+
+    garbage_hits = [d for d in raw_detections if is_garbage_detection(d)]
+    pothole_hits = [d for d in raw_detections if is_pothole_detection(d)]
+
+    # If the caption strongly points to potholes, keep pothole detections first.
+    if is_pothole_caption and pothole_hits:
+        return pothole_hits
+
+    # If a pothole is present, keep it as the primary issue even if litter is also visible.
+    if pothole_hits:
+        return pothole_hits
+
+    # Only use garbage detections when there is no pothole signal at all.
+    if is_garbage_caption and garbage_hits:
+        return garbage_hits
+
+    return raw_detections
 
 
 @router.post("/analyze")
@@ -74,23 +138,10 @@ async def analyze_image(
 
     # AI 2: BLIP Captioning
     image_caption = generate_caption(image)
-    
-    # --- FALSE POSITIVE FILTER ---
-    caption_lower = image_caption.lower()
-    is_garbage = any(kw in caption_lower for kw in ['trash', 'garbage', 'litter', 'waste', 'cardboard', 'plastic', 'bottles', 'box', 'debris', 'dump', 'rubbish', 'scrap'])
-    filtered_detections = []
-    for d in raw_detections:
-        cls_name = d["class_name"].lower()
-        if "garbage" in cls_name:
-            if is_garbage:
-                filtered_detections.append(d)
-        else:
-            filtered_detections.append(d)
-            
-    detections = filtered_detections
 
-    # AI 3: Auto-infer category
-    category = infer_category(detections)
+    # --- FALSE POSITIVE FILTER ---
+    detections = filter_detections_for_caption(raw_detections, image_caption)
+    category = infer_category(detections, image_caption=image_caption)
 
     # AI 4: Severity Prediction
     severity, severity_score = predict_severity(detections, category)
@@ -154,23 +205,12 @@ async def create_complaint(
 
     # AI 2: Generative Assistance
     image_caption = generate_caption(image)
-    
-    # --- FALSE POSITIVE FILTER ---
-    caption_lower = image_caption.lower()
-    is_garbage = any(kw in caption_lower for kw in ['trash', 'garbage', 'litter', 'waste', 'cardboard', 'plastic', 'bottles', 'box', 'debris', 'dump', 'rubbish', 'scrap'])
-    filtered_detections = []
-    for d in raw_detections:
-        cls_name = d["class_name"].lower()
-        if "garbage" in cls_name:
-            if is_garbage:
-                filtered_detections.append(d)
-        else:
-            filtered_detections.append(d)
-            
-    detections = filtered_detections
 
-    # AI 3: Auto-infer category from detections
-    category = infer_category(detections)
+    # --- FALSE POSITIVE FILTER ---
+    detections = filter_detections_for_caption(raw_detections, image_caption)
+
+    # AI 3: Auto-infer category from detections or text fallback
+    category = infer_category(detections, image_caption=image_caption, title=title, description=description)
 
     # AI 3: Severity Prediction
     severity, severity_score = predict_severity(detections, category)
@@ -183,7 +223,7 @@ async def create_complaint(
         
     # AI 4: Duplicate Check
     phash = calculate_phash(image)
-    stmt = select(Complaint).where(Complaint.category == category)
+    stmt = select(Complaint).where(Complaint.category == category).where(Complaint.is_deleted == False)
     result = await db.execute(stmt)
     existing_complaints = result.scalars().all()
     
@@ -251,9 +291,9 @@ async def get_analytics(
         raise HTTPException(status_code=403, detail="Not authorized")
         
     # Count by status
-    status_counts = await db.execute(select(Complaint.status, func.count(Complaint.id)).group_by(Complaint.status))
+    status_counts = await db.execute(select(Complaint.status, func.count(Complaint.id)).where(Complaint.is_deleted == False).group_by(Complaint.status))
     # Count by severity
-    severity_counts = await db.execute(select(Complaint.severity, func.count(Complaint.id)).group_by(Complaint.severity))
+    severity_counts = await db.execute(select(Complaint.severity, func.count(Complaint.id)).where(Complaint.is_deleted == False).group_by(Complaint.severity))
     
     return {
         "status_counts": {s.value: c for s, c in status_counts.all() if s},
@@ -270,7 +310,7 @@ async def get_complaint(
     result = await db.execute(stmt)
     complaint = result.scalars().first()
     
-    if not complaint:
+    if not complaint or complaint.is_deleted:
         raise HTTPException(status_code=404, detail="Complaint not found")
         
     if current_user.role == RoleEnum.citizen and complaint.user_id != current_user.id:
@@ -307,15 +347,55 @@ async def update_complaint_status(
             
     return complaint
 
+@router.patch("/{complaint_id}/notes", response_model=ComplaintResponse)
+async def update_complaint_notes(
+    complaint_id: int,
+    notes_update: ComplaintUpdateNotes,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    if current_user.role == RoleEnum.citizen:
+        raise HTTPException(status_code=403, detail="Not authorized to update notes")
+        
+    stmt = select(Complaint).options(selectinload(Complaint.detections)).where(Complaint.id == complaint_id)
+    result = await db.execute(stmt)
+    complaint = result.scalars().first()
+    
+    if not complaint:
+        raise HTTPException(status_code=404, detail="Complaint not found")
+        
+    complaint.officer_notes = notes_update.officer_notes
+    await db.commit()
+    await db.refresh(complaint)
+    
+    return complaint
+
+@router.post("/{complaint_id}/split")
+async def split_cluster(
+    complaint_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    if current_user.role == RoleEnum.citizen:
+        raise HTTPException(status_code=403, detail="Not authorized to split clusters")
+        
+    stmt = select(Complaint).where(Complaint.duplicate_of == complaint_id)
+    result = await db.execute(stmt)
+    duplicates = result.scalars().all()
+    
+    for dup in duplicates:
+        dup.is_duplicate = False
+        dup.duplicate_of = None
+        
+    await db.commit()
+    return {"message": f"Cluster split successfully. {len(duplicates)} reports unlinked."}
+
 @router.delete("/{complaint_id}")
 async def delete_complaint(
     complaint_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    if current_user.role == RoleEnum.citizen:
-        raise HTTPException(status_code=403, detail="Not authorized to delete complaints")
-        
     stmt = select(Complaint).where(Complaint.id == complaint_id)
     result = await db.execute(stmt)
     complaint = result.scalars().first()
@@ -323,7 +403,17 @@ async def delete_complaint(
     if not complaint:
         raise HTTPException(status_code=404, detail="Complaint not found")
         
-    await db.delete(complaint)
+    if current_user.role == RoleEnum.citizen and complaint.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this complaint")
+        
+    # Unlink any child duplicates to prevent foreign key violation
+    stmt_dups = select(Complaint).where(Complaint.duplicate_of == complaint_id)
+    result_dups = await db.execute(stmt_dups)
+    for dup in result_dups.scalars().all():
+        dup.is_duplicate = False
+        dup.duplicate_of = None
+        
+    complaint.is_deleted = True
     await db.commit()
     
     return {"message": "Complaint deleted successfully"}

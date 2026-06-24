@@ -28,6 +28,7 @@ export default function Auth() {
       localStorage.setItem('role', userRes.data.role);
       localStorage.setItem('userName', userRes.data.name);
       localStorage.setItem('userEmail', userRes.data.email);
+      localStorage.setItem('authProvider', userRes.data.auth_provider);
       navigate('/');
     } catch (err) {
       setError(err.response?.data?.detail || 'Authentication failed. Please try again.');
@@ -46,6 +47,7 @@ export default function Auth() {
       localStorage.setItem('role', userRes.data.role);
       localStorage.setItem('userName', userRes.data.name);
       localStorage.setItem('userEmail', userRes.data.email);
+      localStorage.setItem('authProvider', userRes.data.auth_provider);
       navigate('/');
     } catch (err) {
       setError(err.response?.data?.detail || 'Authentication failed. Please try again.');

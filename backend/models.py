@@ -51,8 +51,10 @@ class Complaint(Base):
     phash = Column(String(100), nullable=True)
     ai_summary = Column(Text, nullable=True)
     resolution_blueprint = Column(Text, nullable=True)
+    officer_notes = Column(Text, nullable=True)
     is_duplicate = Column(Boolean, default=False)
     duplicate_of = Column(Integer, ForeignKey("complaints.id"), nullable=True)
+    is_deleted = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

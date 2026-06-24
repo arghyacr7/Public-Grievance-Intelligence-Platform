@@ -7,7 +7,8 @@ def main():
     model = YOLO('yolov8n-seg.pt') 
 
     # Paths
-    dataset_yaml = r"C:\Users\iamar\Downloads\civic_issues_backend\grievance_models\pothole_seg_dataset\Pothole_Segmentation_YOLOv8\data.yaml"
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    dataset_yaml = os.path.join(base_dir, "grievance_models", "pothole_seg_dataset", "Pothole_Segmentation_YOLOv8", "data.yaml")
     
     print(f"Starting training on dataset: {dataset_yaml}")
     
@@ -34,7 +35,7 @@ def main():
     # We can just get the model's trainer save_dir
     save_dir = getattr(model.trainer, 'save_dir', 'runs/segment/train')
     best_pt = Path(save_dir) / "weights" / "best.pt"
-    target_pt = Path(r"C:\Users\iamar\Downloads\civic_issues_backend\grievance_models\pothole_seg_model.pt")
+    target_pt = Path(base_dir) / "grievance_models" / "pothole_seg_model.pt"
     
     if best_pt.exists():
         shutil.copy(best_pt, target_pt)

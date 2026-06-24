@@ -7,6 +7,7 @@ import CitizenPortal from './pages/CitizenPortal';
 import Dashboard from './pages/Dashboard';
 import TrackComplaint from './pages/TrackComplaint';
 import Home from './pages/Home';
+import OfficerProfile from './components/OfficerProfile';
 
 function App() {
   const navigate = useNavigate();
@@ -14,6 +15,7 @@ function App() {
   const token = localStorage.getItem('token');
   const role  = localStorage.getItem('role');
   const userName = localStorage.getItem('userName');
+  const userEmail = localStorage.getItem('userEmail');
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -27,6 +29,7 @@ function App() {
     localStorage.removeItem('role');
     localStorage.removeItem('userName');
     localStorage.removeItem('userEmail');
+    localStorage.removeItem('authProvider');
     navigate('/auth');
   };
 
@@ -65,17 +68,12 @@ function App() {
           
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
             {token ? (
-              <>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginRight: '0.5rem' }}>
-                  <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--accent)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: '0.85rem' }}>
-                    {userName ? userName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'U'}
-                  </div>
-                  <span style={{ fontSize: '0.95rem', fontWeight: 600, color: '#0f2b3e', display: window.innerWidth > 768 ? 'block' : 'none' }}>
-                    Welcome, {userName || 'User'}
-                  </span>
-                </div>
-                <button id="logout-btn" onClick={handleLogout} className="btn btn-outline btn-sm">Sign Out</button>
-              </>
+              <OfficerProfile 
+                userName={userName} 
+                userEmail={userEmail} 
+                role={role} 
+                handleLogout={handleLogout} 
+              />
             ) : (
               <>
                 <Link to="/auth" className="btn btn-outline btn-sm">Login</Link>

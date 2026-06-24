@@ -12,6 +12,9 @@ GARBAGE_MODEL_PATH = ML_MODELS_DIR / "garbage_model.pt"
 POTHOLE_MODEL = None
 GARBAGE_MODEL = None
 
+POTHOLE_CONFIDENCE_THRESHOLD = 0.40
+GARBAGE_CONFIDENCE_THRESHOLD = 0.80
+
 def load_model():
     global POTHOLE_MODEL, GARBAGE_MODEL
     # Load pothole detection model if exists
@@ -46,7 +49,8 @@ def detect_issues(image: Image.Image):
                         cls_idx = int(box.cls[0])
                         class_name = POTHOLE_MODEL.names[cls_idx]
                         
-                        if conf > 0.05:
+                        if conf >= POTHOLE_CONFIDENCE_THRESHOLD:
+                            print(f"POTHOLE DETECTED: {class_name} | confidence={conf}")
                             # Standard bounding box
                             bbox = box.xyxy[0].tolist() # [x1, y1, x2, y2]
                             
@@ -65,24 +69,35 @@ def detect_issues(image: Image.Image):
             print(f"Pothole segmentation inference failed: {exc}")
             
     # Run Garbage Image Classification
+    # Run Garbage Image Classification
     if GARBAGE_MODEL:
         try:
             results = GARBAGE_MODEL(image)
+
             for result in results:
-                # result.probs contains probabilities for classification
                 top1_idx = result.probs.top1
                 top1_conf = float(result.probs.top1conf)
                 class_name = GARBAGE_MODEL.names[top1_idx]
-                
-                # We add garbage detection if confidence is decent (lowered to 0.05 for testing)
-                # Since we don't have a bounding box for the whole image, we create a full-image box
-                if top1_conf > 0.05:
+
+                print(
+                    f"GARBAGE CLASSIFICATION: {class_name} | confidence={top1_conf}"
+                )
+
+                # Only report garbage when the classifier is highly confident.
+                if top1_conf >= GARBAGE_CONFIDENCE_THRESHOLD:
                     width, height = image.size
+
                     detections.append({
                         "class_name": f"Garbage ({class_name.title()})",
                         "confidence": round(top1_conf, 4),
-                        "bbox_json": str([0.0, 0.0, float(width), float(height)]),
+                        "bbox_json": str([
+                            0.0,
+                            0.0,
+                            float(width),
+                            float(height)
+                        ]),
                     })
+
         except Exception as exc:
             print(f"Garbage classification inference failed: {exc}")
 

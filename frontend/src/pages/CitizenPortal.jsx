@@ -249,7 +249,7 @@ export default function CitizenPortal() {
       )}
 
       {/* 4-Column Layout */}
-      <form onSubmit={handleSubmit} className="grid-4" style={{ alignItems: 'start' }}>
+      <div className="grid-4" style={{ alignItems: 'start' }}>
         
         {/* COLUMN 1: Upload & GPS */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -370,7 +370,7 @@ export default function CitizenPortal() {
             )}
           </div>
 
-          <button type="submit" className="btn" style={{ width: '100%', padding: '1rem', fontSize: '1.1rem' }} disabled={submitting || step === 'upload'}>
+          <button type="button" onClick={handleSubmit} className="btn" style={{ width: '100%', padding: '1rem', fontSize: '1.1rem' }} disabled={submitting || step === 'upload'}>
             {submitting ? 'Submitting...' : '🚀 Submit Report'}
           </button>
         </div>
@@ -454,7 +454,7 @@ export default function CitizenPortal() {
           </div>
         </div>
 
-      </form>
+      </div>
     </div>
   );
 }

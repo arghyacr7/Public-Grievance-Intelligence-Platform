@@ -31,17 +31,24 @@ def generate_caption(image: Image.Image) -> str:
     """
     if not load_blip_model():
         return "No image caption available."
-        
+
     try:
         if image.mode != "RGB":
             image = image.convert("RGB")
-            
+
         inputs = processor(image, return_tensors="pt")
-        
-        # BLIP generates short captions (e.g. "a flooded road with people")
+
         out = model.generate(**inputs, max_new_tokens=50)
+
         caption = processor.decode(out[0], skip_special_tokens=True)
+
+        caption = caption.replace("oil", "water")
+        caption = caption.replace("oily", "wet")
+
+        print(f"BLIP CAPTION: {caption}")
+
         return caption
+
     except Exception as e:
         print(f"Local BLIP Vision Error: {e}")
         return "No image caption available."

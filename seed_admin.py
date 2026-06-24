@@ -16,14 +16,15 @@ async def seed_admin():
         existing_user = result.scalars().first()
 
         if existing_user:
-            print("User exists. Updating role to officer...")
+            print("User exists. Updating role to officer and setting default password...")
             existing_user.role = RoleEnum.officer
+            existing_user.hashed_password = get_password_hash("admin123")
         else:
-            print("Creating admin user (Google Login ready)...")
+            print("Creating admin user...")
             new_admin = User(
                 name="Admin User",
                 email=admin_email,
-                hashed_password=None,
+                hashed_password=get_password_hash("admin123"),
                 role=RoleEnum.officer
             )
             db.add(new_admin)

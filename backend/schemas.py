@@ -22,6 +22,7 @@ class UserResponse(BaseModel):
     email: EmailStr
     role: RoleEnum
     auth_provider: str
+    created_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
 
 # Detection Schemas
@@ -48,6 +49,9 @@ class ComplaintCreate(ComplaintBase):
 class ComplaintUpdateStatus(BaseModel):
     status: StatusEnum
 
+class ComplaintUpdateNotes(BaseModel):
+    officer_notes: str
+
 class ComplaintResponse(ComplaintBase):
     id: int
     user_id: Optional[int]
@@ -56,10 +60,12 @@ class ComplaintResponse(ComplaintBase):
     severity: Optional[SeverityEnum]
     severity_score: Optional[float]
     image_path: str
-    ai_summary: Optional[str]
-    resolution_blueprint: Optional[str]
+    ai_summary: Optional[str] = None
+    resolution_blueprint: Optional[str] = None
+    officer_notes: Optional[str] = None
     is_duplicate: bool
     duplicate_of: Optional[int]
+    is_deleted: bool = False
     created_at: datetime
     updated_at: Optional[datetime]
     detections: List[DetectionResultResponse] = []

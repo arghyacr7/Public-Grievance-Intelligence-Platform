@@ -26,6 +26,7 @@ export const api = {
   register: (data) => client.post('/auth/register', data),
   googleLogin: (credential) => client.post('/auth/google', { credential }),
   getMe: () => client.get('/auth/me'),
+  getMyStats: () => client.get('/auth/me/stats'),
   
   submitComplaint: (formData) => client.post('/complaints/', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
@@ -36,6 +37,8 @@ export const api = {
   getComplaints: () => client.get('/complaints/'),
   getComplaint: (id) => client.get(`/complaints/${id}`),
   updateStatus: (id, status) => client.patch(`/complaints/${id}/status`, { status }),
+  updateNotes: (id, notes) => client.patch(`/complaints/${id}/notes`, { officer_notes: notes }),
   getAnalytics: () => client.get('/complaints/analytics'),
   deleteComplaint: (id) => client.delete(`/complaints/${id}`),
+  splitCluster: (id) => client.post(`/complaints/${id}/split`),
 };

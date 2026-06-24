@@ -1,4 +1,5 @@
 import os
+from unicodedata import category
 from groq import Groq
 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
@@ -68,58 +69,117 @@ def generate_blueprint(title: str, description: str, category: str, severity: st
         print(f"Groq API Error: {e}")
         return "- Dispatch crew to location.\n- Assess and repair.\n- Update status to Resolved."
 
-def generate_title_description(detections: list, image_caption: str = None, category: str = "General") -> dict:
-    """Auto-generate a title and description for a civic complaint using Groq."""
+def generate_title_description(
+    detections: list,
+    image_caption: str = None,
+    category: str = "General"
+) -> dict:
+
     client = _get_client()
-    
-    detection_str = ", ".join([f"{d['class_name']} ({d['confidence'] * 100:.0f}%)" for d in detections]) if detections else "No objects detected"
+
+    detection_str = ", ".join(
+        [
+            f"{d['class_name']} ({d['confidence'] * 100:.0f}%)"
+            for d in detections
+        ]
+    ) if detections else "No objects detected"
+
     caption_str = image_caption or "No visual description available"
-    
+    caption_lower = caption_str.lower()
+
+    # ---------------------------
+    # FALLBACK IF NO GROQ
+    # ---------------------------
+
     if not client:
-        # Fallback when API is unavailable
-        fallback_title = f"{category} Issue Detected" if category != "General" else "Civic Issue Reported"
-        fallback_desc = f"AI detected: {detection_str}. Visual: {caption_str}"
-        return {"title": fallback_title, "description": fallback_desc}
-    
+        return {
+            "title": f"{category} Issue Detected",
+            "description": (
+                f"AI detected: {detection_str}. "
+                f"Visual description: {caption_str}"
+            )
+        }
+
+    # ---------------------------
+    # GROQ PROMPT
+    # ---------------------------
+
     try:
+
         prompt = f"""
-        You are a civic issue reporting assistant. Based on the AI analysis of a citizen-uploaded photo,
-        generate a concise, professional title and description for this civic complaint report.
-        
-        AI Detected Objects: {detection_str}
-        AI Visual Description: "{caption_str}"
-        Category: {category}
-        
-        Return EXACTLY in this format (no extra text, no conversational filler):
-        TITLE: <a short, specific title, max 10 words>
-        DESCRIPTION: <a 2-3 sentence factual description of the issue, its visible condition, and potential impact>
-        """
+You are a civic issue reporting assistant.
+
+IMPORTANT RULES:
+
+1. The image caption may be inaccurate.
+2. Trust the detected category more than the image caption.
+3. Never mention oil unless clearly detected.
+4. Water may be mentioned if the image caption contains water, puddle, wet road, standing water or flooding.
+5. For Garbage category, describe litter, waste, trash or debris.
+6. For Pothole category, describe potholes, road damage and standing water if visible.
+7. If only one pothole is detected, use singular wording such as "a pothole" instead of "multiple potholes".
+8. Do not invent objects not supported by detections or caption.
+9. Keep descriptions factual and concise.
+
+Category:
+{category}
+
+Detected Objects:
+{detection_str}
+
+Image Caption:
+{caption_str}
+
+Return EXACTLY:
+
+TITLE: <short title>
+DESCRIPTION: <2-3 sentence factual description>
+"""
+
         response = client.chat.completions.create(
             model=GROQ_MODEL,
             messages=[
-                {"role": "system", "content": "You are a helpful assistant. Only output exactly what is requested."},
-                {"role": "user", "content": prompt}
+                {
+                    "role": "system",
+                    "content": "Only output the requested format."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
             ],
-            temperature=0.4,
+            temperature=0.3,
             max_tokens=200
         )
+
         text = response.choices[0].message.content.strip()
-        
-        title = category + " Issue Detected"
-        description = f"AI detected: {detection_str}"
-        
+
+        title = f"{category} Issue Detected"
+        description = detection_str
+
         for line in text.split("\n"):
+
             line = line.strip()
+
             if line.upper().startswith("TITLE:"):
                 title = line.split(":", 1)[1].strip()
+
             elif line.upper().startswith("DESCRIPTION:"):
                 description = line.split(":", 1)[1].strip()
-        
-        return {"title": title, "description": description}
-    except Exception as e:
-        print(f"Groq API Error (title/desc): {e}")
+
         return {
-            "title": f"{category} Issue Detected",
-            "description": f"AI detected: {detection_str}. Visual: {caption_str}"
+            "title": title,
+            "description": description
         }
 
+    except Exception as e:
+
+        print(f"Groq API Error (title/desc): {e}")
+
+        return {
+            "title": f"{category} Issue Detected",
+            "description": (
+                f"AI detected: {detection_str}. "
+                f"Visual description: {caption_str}"
+            )
+        }

@@ -31,6 +31,13 @@ def upgrade_db():
     except Exception as e:
         print(f"Failed to backfill submitted_by: {e}")
         
+    # 3. Add officer_notes to complaints
+    try:
+        cursor.execute("ALTER TABLE complaints ADD COLUMN officer_notes TEXT")
+        print("Added officer_notes to complaints.")
+    except sqlite3.OperationalError as e:
+        print(f"Column officer_notes might already exist: {e}")
+
     conn.commit()
     conn.close()
     print("Database upgrade complete.")

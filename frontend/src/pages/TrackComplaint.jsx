@@ -32,6 +32,33 @@ const SearchIcon = () => (
 
 const STATUS_STEPS = ['Submitted', 'Seen', 'Verified', 'Accepted', 'Resolved'];
 
+const parseApiDate = (value) => {
+  if (!value) return null;
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  if (typeof value === 'string' && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(value)) {
+    return new Date(`${value.replace(' ', 'T')}Z`);
+  }
+
+  return date;
+};
+
+const formatDisplayDateTime = (value) => {
+  const date = parseApiDate(value);
+  if (!date || Number.isNaN(date.getTime())) return 'N/A';
+
+  return date.toLocaleString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+};
+
 export default function TrackComplaint() {
   const { id } = useParams();
   const [complaintId, setComplaintId] = useState(id || '');
@@ -62,7 +89,7 @@ export default function TrackComplaint() {
   const fetchMyComplaints = async () => {
     try {
       const res = await api.getComplaints();
-      setMyComplaints(res.data);
+      setMyComplaints(res.data.filter(c => !c.is_deleted));
     } catch (err) {
       console.error(err);
     }
@@ -92,6 +119,8 @@ export default function TrackComplaint() {
 
   const lat = complaint?.latitude ? parseFloat(complaint.latitude) : 22.5736;
   const lng = complaint?.longitude ? parseFloat(complaint.longitude) : 88.3639;
+  const complaintSubmittedAt = complaint?.created_at;
+  const complaintUpdatedAt = complaint?.updated_at || complaint?.created_at;
 
   const handleDownloadReceipt = () => {
     if (!complaint) return;
@@ -105,7 +134,7 @@ Complaint ID : CMP-2025-${String(complaint.id).padStart(5, '0')}
 Status       : ${complaint.status}
 Category     : ${complaint.category}
 Severity     : ${complaint.severity}
-Reported On  : ${new Date(complaint.created_at).toLocaleString()}
+Reported On  : ${formatDisplayDateTime(complaint.created_at)}
 Location     : Lat: ${complaint.latitude}, Lng: ${complaint.longitude}
 Title        : ${complaint.title}
 
@@ -124,6 +153,19 @@ Thank you for helping us build a smarter city.
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  const handleDeleteComplaint = async () => {
+    if (window.confirm("Are you sure you want to delete this complaint? This action cannot be undone.")) {
+      try {
+        await api.deleteComplaint(complaint.id);
+        navigate('/track');
+        window.location.reload();
+      } catch (err) {
+        alert("Failed to delete complaint: " + (err.response?.data?.detail || err.message));
+        console.error("Delete error:", err);
+      }
+    }
   };
 
   return (
@@ -246,7 +288,7 @@ Thank you for helping us build a smarter city.
             <div>
               <p style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', margin: '0 0 0.25rem' }}>Reported On</p>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span>📅</span> {new Date(complaint.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}, {new Date(complaint.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                <span>📅</span> {formatDisplayDateTime(complaint.created_at)}
               </p>
             </div>
 
@@ -263,9 +305,18 @@ Thank you for helping us build a smarter city.
               <div style={{ borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border)', marginBottom: '0.5rem', maxHeight: '180px' }}>
                 <AnnotatedImage src={imageUrl} detections={complaint.detections} />
               </div>
-              <button onClick={handleDownloadReceipt} className="btn btn-outline" style={{ width: '100%', padding: '0.5rem', fontSize: '0.85rem', gap: '0.5rem' }}>
+              <button onClick={handleDownloadReceipt} className="btn btn-outline" style={{ width: '100%', padding: '0.5rem', fontSize: '0.85rem', gap: '0.5rem', marginBottom: '0.5rem' }}>
                 <span>📥</span> Download Receipt
               </button>
+
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button onClick={handleDeleteComplaint} className="btn" style={{ flex: 1, padding: '0.5rem', fontSize: '0.85rem', background: '#dc3545', color: '#fff', border: 'none' }}>
+                  <span>🗑️</span> Delete
+                </button>
+                <button onClick={() => navigate('/contact')} className="btn btn-outline" style={{ flex: 1, padding: '0.5rem', fontSize: '0.85rem' }}>
+                  <span>💬</span> Contact Us
+                </button>
+              </div>
             </div>
 
             {/* Officer Status Update */}
@@ -335,7 +386,9 @@ Thank you for helping us build a smarter city.
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
                         <p style={{ fontSize: '0.85rem', fontWeight: 600, margin: 0, color: '#1d1d1f' }}>{step}</p>
-                        <p style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', margin: 0 }}>{new Date().toLocaleDateString('en-GB')} {new Date().toLocaleTimeString('en-US', {hour:'2-digit',minute:'2-digit'})}</p>
+                        <p style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', margin: 0 }}>
+                          {idx === 0 ? formatDisplayDateTime(complaintSubmittedAt) : formatDisplayDateTime(complaintUpdatedAt)}
+                        </p>
                       </div>
                       <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>{desc}</p>
                     </div>
@@ -347,6 +400,46 @@ Thank you for helping us build a smarter city.
             <div style={{ background: '#e6f4ea', color: '#137333', padding: '1rem', borderRadius: '8px', fontSize: '0.85rem', marginTop: '2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <span>ℹ️</span> You will receive a notification when the status is updated.
             </div>
+
+            {/* Enhanced Officer Notes */}
+            {complaint.officer_notes && (
+              <div style={{ 
+                marginTop: '1.5rem', 
+                background: 'linear-gradient(to right, #f8fafc, #eff6ff)', 
+                border: '1px solid #bfdbfe', 
+                borderRadius: '12px', 
+                padding: '1.25rem',
+                position: 'relative',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#3b82f6', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', boxShadow: '0 2px 4px rgba(59,130,246,0.3)' }}>
+                    👨🏻‍💼
+                  </div>
+                  <div>
+                    <h4 style={{ fontSize: '0.95rem', fontWeight: 600, color: '#1e3a8a', margin: 0 }}>Message from Officer</h4>
+                    <span style={{ fontSize: '0.75rem', color: '#3b82f6', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Official Update</span>
+                  </div>
+                </div>
+                <div style={{ 
+                  background: 'white', 
+                  padding: '1rem 1.25rem', 
+                  borderRadius: '10px', 
+                  border: '1px solid #e2e8f0',
+                  color: '#334155',
+                  fontSize: '0.9rem',
+                  lineHeight: '1.6',
+                  fontStyle: 'italic',
+                  position: 'relative',
+                  marginTop: '0.5rem'
+                }}>
+                  <div style={{ position: 'absolute', top: '-6px', left: '20px', width: '12px', height: '12px', background: 'white', transform: 'rotate(45deg)', borderLeft: '1px solid #e2e8f0', borderTop: '1px solid #e2e8f0' }} />
+                  <div style={{ position: 'relative', zIndex: 1, whiteSpace: 'pre-wrap', fontWeight: 500 }}>
+                    {complaint.officer_notes}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* COLUMN 3: Map & Updates */}

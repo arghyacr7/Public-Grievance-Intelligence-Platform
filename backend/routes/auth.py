@@ -3,12 +3,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy import func
 from datetime import timedelta
 from google.oauth2 import id_token
 from google.auth.transport import requests
 
 from ..database import get_db
-from ..models import User, RoleEnum
+from ..models import User, RoleEnum, Complaint, StatusEnum
 from ..schemas import UserResponse, Token, GoogleLoginRequest, UserRegister
 from ..auth_utils import create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES, get_current_active_user, get_password_hash, verify_password
 
@@ -65,6 +66,98 @@ async def google_login(req: GoogleLoginRequest, db: AsyncSession = Depends(get_d
 @router.get("/me", response_model=UserResponse)
 async def read_users_me(current_user: User = Depends(get_current_active_user)):
     return current_user
+
+@router.get("/me/stats")
+async def get_my_stats(current_user: User = Depends(get_current_active_user), db: AsyncSession = Depends(get_db)):
+    """Return officer performance stats from the complaints table."""
+    # Total complaints in the system (for officers) or user's own complaints (for citizens)
+    if current_user.role == RoleEnum.officer:
+        # Officers see all non-deleted complaints as their workload
+        total_stmt = select(func.count(Complaint.id)).where(Complaint.is_deleted == False)
+        resolved_stmt = select(func.count(Complaint.id)).where(
+            Complaint.is_deleted == False,
+            Complaint.status == StatusEnum.resolved
+        )
+        active_stmt = select(func.count(Complaint.id)).where(
+            Complaint.is_deleted == False,
+            Complaint.status != StatusEnum.resolved
+        )
+        # Recent complaints for notifications
+        recent_stmt = (
+            select(Complaint)
+            .where(Complaint.is_deleted == False)
+            .order_by(Complaint.created_at.desc())
+            .limit(5)
+        )
+    else:
+        # Citizens see their own stats
+        total_stmt = select(func.count(Complaint.id)).where(
+            Complaint.user_id == current_user.id,
+            Complaint.is_deleted == False
+        )
+        resolved_stmt = select(func.count(Complaint.id)).where(
+            Complaint.user_id == current_user.id,
+            Complaint.is_deleted == False,
+            Complaint.status == StatusEnum.resolved
+        )
+        active_stmt = select(func.count(Complaint.id)).where(
+            Complaint.user_id == current_user.id,
+            Complaint.is_deleted == False,
+            Complaint.status != StatusEnum.resolved
+        )
+        recent_stmt = (
+            select(Complaint)
+            .where(Complaint.user_id == current_user.id, Complaint.is_deleted == False)
+            .order_by(Complaint.created_at.desc())
+            .limit(5)
+        )
+
+    total_result = await db.execute(total_stmt)
+    total = total_result.scalar() or 0
+
+    resolved_result = await db.execute(resolved_stmt)
+    resolved = resolved_result.scalar() or 0
+
+    active_result = await db.execute(active_stmt)
+    active = active_result.scalar() or 0
+
+    resolution_rate = round((resolved / total) * 100) if total > 0 else 0
+
+    recent_result = await db.execute(recent_stmt)
+    recent_complaints = recent_result.scalars().all()
+
+    notifications = []
+    for c in recent_complaints:
+        severity = c.severity.value if c.severity else "Low"
+        icon_map = {"Critical": "🔴", "High": "🟠", "Medium": "🟡", "Low": "🟢"}
+        icon = icon_map.get(severity, "🔵")
+        
+        if c.status == StatusEnum.resolved:
+            text = f"Complaint #{c.id} marked resolved"
+            icon = "🟢"
+        elif c.is_duplicate:
+            text = f"Duplicate complaint #{c.id} detected"
+            icon = "🔵"
+        elif severity == "Critical":
+            text = f"Critical issue #{c.id}: {c.title[:40]}"
+        else:
+            text = f"New complaint #{c.id}: {c.title[:40]}"
+        
+        notifications.append({
+            "id": c.id,
+            "text": text,
+            "icon": icon,
+            "time": c.created_at.isoformat() if c.created_at else None,
+            "severity": severity,
+        })
+
+    return {
+        "total": total,
+        "active": active,
+        "resolved": resolved,
+        "resolution_rate": resolution_rate,
+        "notifications": notifications,
+    }
 
 @router.post("/register", response_model=Token)
 async def register_user(user_in: UserRegister, db: AsyncSession = Depends(get_db)):
